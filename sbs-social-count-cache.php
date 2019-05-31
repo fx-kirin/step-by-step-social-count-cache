@@ -3,7 +3,7 @@
 Plugin Name: SBS Social Count Cache
 Plugin URI: https://wordpress.org/plugins/step-by-step-social-count-cache/
 Description: ソーシャルブックマークのカウントをキャッシュするプラグイン
-Version: 1.2
+Version: 1.7
 Author: oxynotes
 Author URI: http://oxynotes.com
 License: GPL2
@@ -87,6 +87,8 @@ class SBS_SocialCountCache {
 		$this->sbs_facebook_app_token = get_site_option('sbs_facebook_app_token');
 		$this->sbs_active_sns = get_site_option('sbs_active_sns');
 		$this->sbs_cache_time = get_site_option('sbs_cache_time');
+		$this->sbs_original_tag = get_site_option('sbs_original_tag');
+		$this->sbs_original_tag_default = get_site_option('sbs_original_tag_default');
 
 		add_action( 'admin_menu', array( $this, 'add_plugin_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_mysettings' ) );
@@ -99,7 +101,7 @@ class SBS_SocialCountCache {
 
 
 	// インストール時の初期設定
-	public function activate() {
+	public static function activate() {
 
 		// カウントを保存するためのテーブルを作る（既にテーブルがある場合は作らない）
 		self::create_tables();
@@ -237,48 +239,56 @@ class SBS_SocialCountCache {
 
 	/**
 	 * オプションのデフォルト値をセットする
-	 * 
-	 * 設定を無効にした時点で削除されるので、
-	 * インストール時には値があることは通常無い
 	 */
 	private static function set_user_settings() {
 
-		$sbs_cache_time = get_site_option('sbs_cache_time');
-		if ( !$sbs_cache_time ) {
+		// 設定のデフォルトの値
+		$default_active_sns = array(
+			'twitter' => 1,
+			'facebook' => 1,
+			'google' => 1,
+			'hatena' => 1,
+			'pocket' => 1,
+			'feedly' => 1,
+			'rss_url' => ''
+		);
 
-			// 設定のデフォルトの値
-			$default_active_sns = array(
-				'twitter' => 1,
-				'facebook' => 1,
-				'google' => 1,
-				'hatena' => 1,
-				'pocket' => 1,
-				'feedly' => 1,
-				'rss_type' => ''
-			);
+		$default_cache_time = array(
+			'1day' => array(
+				'day' => 0,
+				'hour' => 0,
+				'minute' => 30
+			),
+			'1week' => array(
+				'day' => 1,
+				'hour' => 0,
+				'minute' => 0
+			),
+			'after' => array(
+				'day' => 7,
+				'hour' => 0,
+				'minute' => 0
+			)
+		);
 
-			// 設定のデフォルトの値
-			$default_cache_time = array(
-				'1day' => array(
-					'day' => 0,
-					'hour' => 0,
-					'minute' => 30
-				),
-				'1week' => array(
-					'day' => 1,
-					'hour' => 0,
-					'minute' => 0
-				),
-				'after' => array(
-					'day' => 7,
-					'hour' => 0,
-					'minute' => 0
-				)
-			);
+		// スクエアとバルーンタイプのデフォルト値を保存しておくための配列
+		// pocketとfeedlyはカスタマイズしないため、デフォルト値を持たない
+		$default_original_tag = array(
+			'hatena_square' => '<li class="hatena_count"><a href="http://b.hatena.ne.jp/add?mode=confirm&url=[[url]]" class="count" target="_blank"></a><span class="count">[[count]]</span></li>',
+			'twitter_square' => '<li class="twitter_count"><a href="https://twitter.com/intent/tweet?original_referer=[[url]]&text=[[title]]%20%7C%20[[site_title]]&tw_p=tweetbutton&url=[[url]]&via=[[site_title]]" class="count" target="_blank"></a><span class="count">[[count]]</span></li>',
+			'google_square' => '<li class="google_count"><a href="https://plus.google.com/share?url=[[url]]" class="count" target="_blank"></a><span class="count">[[count]]</span></li>',
+			'facebook_square' => '<li class="facebook_count"><a href="https://www.facebook.com/sharer/sharer.php?u=[[url]]" class="count" target="_blank"></a><span class="count">[[count]]</span></li>',
+			'hatena_balloon' => '<li class="hatena_count"><div class="bubble"><a href="http://b.hatena.ne.jp/add?mode=confirm&url=[[url]]" class="count" target="_blank">[[count]]</a></div><a class="bgimage" href="http://b.hatena.ne.jp/add?mode=confirm&url=[[url]]" class="count" target="_blank"></a></li>',
+			'twitter_balloon' => '<li class="twitter_count"><div class="bubble"><a href="https://twitter.com/intent/tweet?original_referer=[[url]]&text=[[title]]%20%7C%20[[site_title]]&tw_p=tweetbutton&url=[[url]]&via=[[site_title]]" class="count" target="_blank">[[count]]</a></div><a class="bgimage" href="https://twitter.com/intent/tweet?original_referer=[[url]]&text=[[title]]%20%7C%20[[site_title]]&tw_p=tweetbutton&url=[[url]]&via=[[site_title]]" class="count" target="_blank"></a></li>',
+			'google_balloon' => '<li class="google_count"><div class="bubble"><a href="https://plus.google.com/share?url=[[url]]" class="count" target="_blank">[[count]]</a></div><a class="bgimage" href="https://plus.google.com/share?url=[[url]]" class="count" target="_blank"></a></li>',
+			'facebook_balloon' => '<li class="facebook_count"><div class="bubble"><a href="https://www.facebook.com/sharer/sharer.php?u=[[url]]" class="count" target="_blank">[[count]]</a></div><a class="bgimage" href="https://www.facebook.com/sharer/sharer.php?u=[[url]]" class="count" target="_blank"></a></li>'
+		);
 
-			update_option( 'sbs_active_sns', $default_active_sns );
-			update_option( 'sbs_cache_time', $default_cache_time );
-		}
+		update_option( 'sbs_active_sns', $default_active_sns );
+		update_option( 'sbs_cache_time', $default_cache_time );
+		update_option( 'sbs_original_tag', $default_original_tag );
+		update_option( 'sbs_original_tag_default', $default_original_tag ); // デフォルト値を保存するため同じものを別の設定に追加
+
 	}
 
 
@@ -304,6 +314,7 @@ class SBS_SocialCountCache {
 		delete_option('sbs_cache_time');
 		delete_option('sbs_preload');
 		delete_option('sbs_delete_apc_cache');
+		delete_option('sbs_original_tag');
 
 		// APCキャッシュの削除
 		self::delete_apc_cache();
@@ -362,6 +373,7 @@ class SBS_SocialCountCache {
 		register_setting( 'sbs-social-count-cache', 'sbs_cache_time', array( $this, 'cache_time_validation' ) );
 		register_setting( 'sbs-social-count-cache', 'sbs_preload', array( $this, 'preload_cron' ) );
 		register_setting( 'sbs-social-count-cache', 'sbs_delete_apc_cache', array( $this, 'delete_apc_cache' ) );
+		register_setting( 'sbs-social-count-cache', 'sbs_original_tag', array( $this, 'sbs_original_tag_validation' ) );
 	}
 
 
@@ -418,7 +430,7 @@ class SBS_SocialCountCache {
 	 * このプラグインで作成したAPCのキャッシュを削除する関数
 	 * APCuだとinfoがkeyに変更されているため、APCのみにあるtypeで条件分岐
 	 */
-	function delete_apc_cache() {
+	private static function delete_apc_cache() {
 		//すべてのユーザキャッシュを取得する
 		if ( function_exists( 'apc_store' ) && ini_get( 'apc.enabled' ) ) { // apcモジュール読み込まれており、更に有効かどうか調べる
 			$userCache = apc_cache_info('user');
@@ -498,17 +510,50 @@ class SBS_SocialCountCache {
 
 	/**
 	 * Facebook App Token用のバリデーション関数
-	 * 英数字とバーティカルバー以外が入力されているとエラーを返す
+	 * 英数字と記号以外が入力されているとエラーを返す
+	 * （英数字とバーティカルバーだけだと思ったらハイフンなんかもあった。
+	 * どれだけあるかわからないので記号全般を許可した）
 	 *
 	 * @param	str		Facebook App Token
 	 */
 	function token_validation( $input ) {
 
-		if( empty( $input ) || preg_match( "/^[a-zA-Z0-9|]+$/", $input ) ) {
+		if( empty( $input ) || preg_match( "/^[[:graph:]|[:space:]]+$/i", $input ) ) {
 			return $input;
 		}else{
 			return 'validation_error';
 		}
+
+	}
+
+
+
+	/**
+	 * スクエアタイプ、バルーンタイプの表示用のバリデーション関数
+	 * カスタマイズ用なので基本的には大抵の入力値は許可
+	 * 空だった場合はデフォルト値をセットする。
+	 *
+	 * @param	str		ユーザーの入力値
+	 */
+	function sbs_original_tag_validation( $input ) {
+
+		if ( $input["hatena"] == "" ){
+			$input["hatena"] = $this->sbs_original_tag_default["hatena"];
+		}
+
+		if ( $input["twitter"] == "" ){
+			$input["twitter"] = $this->sbs_original_tag_default["twitter"];
+		}
+
+		if ( $input["google"] == "" ){
+			$input["google"] = $this->sbs_original_tag_default["google"];
+		}
+
+		if ( $input["facebook"] == "" ){
+			$input["facebook"] = $this->sbs_original_tag_default["facebook"];
+		}
+
+		return $input;
 
 	}
 
@@ -530,25 +575,29 @@ class SBS_SocialCountCache {
 			$u_day = ($day * 24 * 60 * 60);
 			$u_hour = ($hour * 60 * 60);
 			$u_minute = ($minute * 60);
-			return $current_time - ( $u_day + $u_hour + $u_minute );
+			return $current_time + ( $u_day + $u_hour + $u_minute );
 	}
 
 
 
 
 	/**
-	 * twitterのカウントを返す
+	 * twitterのカウントを返す jsoon APIを利用
 	 *
+	 * @since	1.5
 	 * @param	str		投稿のURL
 	 * @return	int		返り値はカウント
 	 */
 	public function get_twitter( $url ) {
-		$twit_uri = 'http://urls.api.twitter.com/1/urls/count.json?url=' . rawurlencode($url);
+
+		//$twit_uri = 'http://urls.api.twitter.com/1/urls/count.json?url=' . rawurlencode($url);
+		$twit_uri = 'http://jsoon.digitiminimi.com/twitter/count.json?url=' . rawurlencode($url);
+
 		$result = wp_remote_get( $twit_uri, array( 'timeout' => 5 ) );
 
 		if ( !is_wp_error( $result ) && $result["response"]["code"] === 200 ) {
 			$array = json_decode( $result["body"], true ); // jsonをデコード。trueで連想配列に変換
-			return $array["count"];
+			return (int) $array["count"];
 		} else { // エラー処理が面倒なので0を返す
 			return 0;
 		}
@@ -581,7 +630,7 @@ class SBS_SocialCountCache {
 			if( is_null( $array["share"]["share_count"] ) ) {
 				return 0;
 			} else {
-				return $array["share"]["share_count"];
+				return (int) $array["share"]["share_count"];
 			}
 		} else { // エラー処理が面倒なので0を返す
 			return 0;
@@ -592,16 +641,15 @@ class SBS_SocialCountCache {
 
 
 	/**
-	 * googleのカウントを返す
+	 * googleのカウントを返す（Googleカウント停止のためペンディング）
 	 *
+	 * @since	1.6.1
 	 * @param	str		投稿のURL
 	 * @return	int		返り値はカウント
 	 */
 	public function get_google( $url ){
-		// xamppでhttpsにアクセスすると以下のエラーが。php.iniの最後にextension=php_openssl.dllを付けてサーバ再起動で治る
-		// Unable to find the wrapper "https" - did you forget to enable it when you configured PHP?
+/*
 		$result = wp_remote_get( "https://plusone.google.com/_/+1/fastbutton?url=" . $url, array( 'timeout' => 5 ) );
-
 		if ( !is_wp_error( $result ) && $result["response"]["code"] === 200 ) {
 			$doc = new DOMDocument();
 			libxml_use_internal_errors(true); // Warning: DOMDocument::loadHTML():対策
@@ -611,6 +659,8 @@ class SBS_SocialCountCache {
 		} else { // エラー処理が面倒なので0を返す
 			return 0;
 		}
+*/
+			return 0;
 	}
 
 
@@ -633,7 +683,7 @@ class SBS_SocialCountCache {
 			if( is_null( $array["count"] ) ) {
 				return 0;
 			} else {
-				return $array["count"];
+				return (int) $array["count"];
 			}
 		} else { // エラー処理が面倒なので0を返す
 			return 0;
@@ -650,7 +700,7 @@ class SBS_SocialCountCache {
 	 * @return	int		返り値はカウント
 	 */
 	public function get_pocket( $url ) {
-		$pocket_uri = 'http://widgets.getpocket.com/v1/button?v=1&count=horizontal&url=' . rawurlencode($url);
+		$pocket_uri = 'https://widgets.getpocket.com/v1/button?label=pocket&count=horizontal&v=1&url=' . rawurlencode($url) . '&src=' . rawurlencode($url);
 		$result = wp_remote_get( $pocket_uri, array( 'timeout' => 5 ) );
 
 		if ( !is_wp_error( $result ) && $result["response"]["code"] === 200 ) {
@@ -672,18 +722,19 @@ class SBS_SocialCountCache {
 	/**
 	 * feedlyのカウントを返す
 	 *
+	 * since	2017/10/01	SSL化に対応
 	 * @return	int		返り値はカウント
 	 */
 	public function get_feedly(){
 
 		// デフォルトはRSS2、設定でユーザーの入力値がある場合は、そのフィードをカウントする
-		if ( $this->sbs_active_sns["rss_url"] == "" ) {
+		if ( @$this->sbs_active_sns["rss_url"] == "" ) {
 			$feed_url = rawurlencode( get_bloginfo( 'rss2_url' ) );
 		} else {
 			$feed_url = rawurlencode( $this->sbs_active_sns["rss_url"] );
 		}
 
-		$result = wp_remote_get( 'http://cloud.feedly.com/v3/feeds/feed%2F' . $feed_url );
+		$result = wp_remote_get( 'https://cloud.feedly.com/v3/feeds/feed%2F' . $feed_url );
 
 		$array = json_decode( $result["body"], true );
 
@@ -692,7 +743,7 @@ class SBS_SocialCountCache {
 			if( !isset( $array['subscribers'] ) ){
 				return 0;
 			}else{
-				return $array['subscribers'];
+				return (int) $array['subscribers'];
 			}
 		} else { // エラー処理が面倒なので0を返す
 			return 0;
@@ -761,19 +812,22 @@ class SBS_SocialCountCache {
 
 		// 取得したカウントを日時とともにデータベースへ書き込み
 		// ON DUPLICATE KEY UPDATEでプライマリキーのpostidをフラグに無ければINSERT、あればUPDATE
-		// $nowのプレースホルダーを''で囲むの忘れずに
-		$result2 = $wpdb->query( $wpdb->prepare(
-			"INSERT INTO {$table_name}
+		// 2017/09/29 prepareの後方参照が使えなくなった模様 対応版に変更
+		$sql = "INSERT INTO {$table_name}
 			(postid, day, all_count, twitter_count, facebook_count, google_count, hatena_count, pocket_count, feedly_count)
 			VALUES (%d, %s, %d, %d, %d, %d, %d, %d, %d)
-			ON DUPLICATE KEY UPDATE day = '%2\$s',
-			all_count = %3\$d,
-			twitter_count = %4\$d,
-			facebook_count = %5\$d,
-			google_count = %6\$d,
-			hatena_count = %7\$d,
-			pocket_count = %8\$d,
-			feedly_count = %9\$d",
+			ON DUPLICATE KEY UPDATE
+			day = %s,
+			all_count = %d,
+			twitter_count = %d,
+			facebook_count = %d,
+			google_count = %d,
+			hatena_count = %d,
+			pocket_count = %d,
+			feedly_count = %d;";
+
+		$sql = $wpdb->prepare(
+			$sql,
 			$postid,
 			$now,
 			$socials['all'],
@@ -782,8 +836,18 @@ class SBS_SocialCountCache {
 			$socials['google'],
 			$socials['hatena'],
 			$socials['pocket'],
+			$socials['feedly'],
+			$now,
+			$socials['all'],
+			$socials['twitter'],
+			$socials['facebook'],
+			$socials['google'],
+			$socials['hatena'],
+			$socials['pocket'],
 			$socials['feedly']
-		));
+		);
+
+		$wpdb->query($sql);
 
 		// 値を返すSNSを引数から指定
 		// 出力用に整形
@@ -830,37 +894,37 @@ class SBS_SocialCountCache {
 			$socials = array();
 
 			if( !empty( $this->sbs_active_sns['twitter'] ) ) { // !付きemptyなので0の場合もfalse
-				$socials['twitter'] = $result->twitter_count;
+				$socials['twitter'] = esc_html( $result->twitter_count );
 			} else {
 				$socials['twitter'] = 0;
 			}
 
 			if( !empty( $this->sbs_active_sns['facebook'] ) ) {
-				$socials['facebook'] = $result->facebook_count;
+				$socials['facebook'] = esc_html( $result->facebook_count );
 			} else {
 				$socials['facebook'] = 0;
 			}
 
 			if( !empty( $this->sbs_active_sns['google'] ) ) {
-				$socials['google'] = $result->google_count;
+				$socials['google'] = esc_html( $result->google_count );
 			} else {
 				$socials['google'] = 0;
 			}
 
 			if( !empty( $this->sbs_active_sns['hatena'] ) ) {
-				$socials['hatena'] = $result->hatena_count;
+				$socials['hatena'] = esc_html( $result->hatena_count );
 			} else {
 				$socials['hatena'] = 0;
 			}
 
 			if( !empty( $this->sbs_active_sns['pocket'] ) ) {
-				$socials['pocket'] = $result->pocket_count;
+				$socials['pocket'] = esc_html( $result->pocket_count );
 			} else {
 				$socials['pocket'] = 0;
 			}
 
 			if( !empty( $this->sbs_active_sns['feedly'] ) ) {
-				$socials['feedly'] = $result->feedly_count;
+				$socials['feedly'] = esc_html( $result->feedly_count );
 			} else {
 				$socials['feedly'] = 0;
 			}
@@ -869,37 +933,37 @@ class SBS_SocialCountCache {
 
 		} elseif ( $active_sns == 'twitter' ) {
 			if( !empty( $this->sbs_active_sns['twitter'] ) ) {
-				$socials = $result->twitter_count;
+				$socials = esc_html( $result->twitter_count );
 			} else {
 				$socials = 0;
 			}
 		} elseif ( $active_sns == 'facebook' ) {
 			if( !empty( $this->sbs_active_sns['facebook'] ) ) {
-				$socials = $result->facebook_count;
+				$socials = esc_html( $result->facebook_count );
 			} else {
 				$socials = 0;
 			}
 		} elseif ( $active_sns == 'google' ) {
 			if( !empty( $this->sbs_active_sns['google'] ) ) {
-				$socials = $result->google_count;
+				$socials = esc_html( $result->google_count );
 			} else {
 				$socials = 0;
 			}
 		} elseif ( $active_sns == 'hatena' ) {
 			if( !empty( $this->sbs_active_sns['hatena'] ) ) {
-				$socials = $result->hatena_count;
+				$socials = esc_html( $result->hatena_count );
 			} else {
 				$socials = 0;
 			}
 		} elseif ( $active_sns == 'pocket' ) {
 			if( !empty( $this->sbs_active_sns['pocket'] ) ) {
-				$socials = $result->pocket_count;
+				$socials = esc_html( $result->pocket_count );
 			} else {
 				$socials = 0;
 			}
 		} elseif ( $active_sns == 'feedly' ) {
 			if( !empty( $this->sbs_active_sns['feedly'] ) ) {
-				$socials = $result->feedly_count;
+				$socials = esc_html( $result->feedly_count );
 			} else {
 				$socials = 0;
 			}
@@ -907,6 +971,80 @@ class SBS_SocialCountCache {
 
 		return $socials;
 	}
+
+
+
+
+	/**
+	 * スタイルを追加する関数
+	 */
+	function balloon_style() {
+		// 第1引数がid、第2引数がファイル
+		wp_enqueue_style( 'balloon_style', plugins_url( 'style/balloon_style.css', __FILE__) );
+	}
+
+
+
+	/**
+	 * スタイルを追加する関数
+	 */
+	function square_style() {
+		wp_enqueue_style( 'square_style', plugins_url( 'style/square_style.css', __FILE__) );
+	}
+
+
+
+
+	/**
+	 * ブランケットのタグを実際のデータに置換する関数
+	 * @param	str		SNSボタンのタグ（ブランケット）
+	 * @param	int		各SNSのカウント
+	 * @return	str		ブランケットのタグを置き換えたボタンのタグ
+
+	 * since	1.5.2	エスケープ対応(＃等を含むと正常に動作しなかった)
+	 */
+	function tag_rep( $arg, $count = "" ) {
+		$url = get_permalink();
+		$site_title = get_bloginfo( 'name' );
+
+		// html_entity_decode()を挟まないと"や'が文字参照で表示されてしまうので注意
+		$title = urlencode( html_entity_decode( get_the_title(), ENT_COMPAT, 'UTF-8' ) );
+
+		$search = array( '[[url]]', '[[site_title]]', '[[title]]', '[[count]]' );
+		$replace = array( $url, $site_title, $title, $count );
+		$rep_txt = str_replace( $search, $replace, $arg );
+
+		return $rep_txt;
+	}
+
+
+
+
+	/**
+	 * テストモード時に各パーツから受け取ったコメントを書き出す処理をまとめたもの
+	 * 書き出されたコメントはコールバック関数に渡される
+	 * @param	str		各コメントの要素を受け取る
+	 * @return	str		コールバック関数に渡すコメント
+	 * 
+	 * since	1.5.3	テストモード用に追加
+	 */
+	function output_testmode_comment( $buffer ) {
+		$url = get_permalink();
+		$site_title = get_bloginfo( 'name' );
+
+		// html_entity_decode()を挟まないと"や'が文字参照で表示されてしまうので注意
+		$title = urlencode( html_entity_decode( get_the_title(), ENT_COMPAT, 'UTF-8' ) );
+
+		$search = array( '[[url]]', '[[site_title]]', '[[title]]', '[[count]]' );
+		$replace = array( $url, $site_title, $title, $count );
+		$rep_txt = str_replace( $search, $replace, $arg );
+
+		return $rep_txt;
+	}
+
+
+
+
 
 } // end class
 
@@ -917,6 +1055,19 @@ class SBS_SocialCountCache {
 
 // インスタンスの作成（コンストラクタの実行）
 $SBS_SocialCountCache = new SBS_SocialCountCache();
+
+
+
+/**
+ * テスト用のコールバックをグローバル変数に追加する
+ *
+ * @param	string	$key
+ * @param	mixed	$callback
+ * @return	void
+ */
+function add_callback( $key, $callback ) {
+	$GLOBALS['_sbs_callbacks'][$key] = $callback;
+}
 
 
 
@@ -952,11 +1103,13 @@ function sbs_get_socal_count( $active_sns = null ) {
 	$postid = get_the_ID();
 	$url = get_permalink( $postid );
 
-/*
-	// test用
-	$postid = 105;
-	$url = "http://oxynotes.com/?p=2933";
-*/
+	// デバッグモード
+	//$debug_mode = false;
+	$debug_mode = true;
+
+	// デバッグモード用の配列作成
+	$debug_Log = array();
+
 
 
 
@@ -966,14 +1119,6 @@ function sbs_get_socal_count( $active_sns = null ) {
 	WordPressではdateやstrtotimeの使用は設定によってずれるので推奨されず、
 	代わりにcurrent_timeやget_date_from_gmtの使用が推奨されている。
 	また投稿の最終更新日を取得するにはget_the_modified_timeを使う。
-
-	しかしこれらの関数には謎の仕様があり、なぜか+9時間される。
-	設定画面でUTC+9にしているが、プラグインで使うと更に+9される？？？
-	今回はデータベースの値と、現在の時間が両方+9時間されるので支障ないが、
-	厳密に時間を出さないといけない場合は注意が必要だ。
-	普通に書くと-9時間されたUTCが返ってくるならわかるが、本当に謎。
-	国際化のための使用なのかもしれないが、ありがた迷惑。わざわざソースまで追うのが面倒。
-	そしてCodexの当該タグのページにも解説なし。
 	*/
 
 	$pfx_date = get_the_modified_time('U'); // 投稿の最終更新日時取得
@@ -981,63 +1126,101 @@ function sbs_get_socal_count( $active_sns = null ) {
 	$day = $current_time - (1 * 24 * 60 * 60); // ブログのローカルタイムから1日前のUNIXタイムを取得
 	$week = $day - (6 * 24 * 60 * 60); // 1週間
 
-
-
-
 	// 最終更新日が1日以内、1週間以内、それ以上の場合で振り分け、現時点での有効期限を算出
 	if ( $pfx_date > $day ) { // 最終更新日が1日以内の場合
 		$exp_time = $sbs->exp_time($current_time, $sbs_cache_time['1day']['day'], $sbs_cache_time['1day']['hour'], $sbs_cache_time['1day']['minute']);
-		// var_dump("最終更新日が1日以内"); // テスト用
+		$setting_cache_time = ($sbs_cache_time['1day']['day'] * 24 * 60 * 60) + ($sbs_cache_time['1day']['hour'] * 60 * 60) + ($sbs_cache_time['1day']['minute'] * 60);
+		$debug_Log['投稿の最終更新日から'] = "1日以内";
 	} elseif( $pfx_date > $week ) { // 1週間以内
 		$exp_time = $sbs->exp_time($current_time, $sbs_cache_time['1week']['day'], $sbs_cache_time['1week']['hour'], $sbs_cache_time['1week']['minute']);
-		// var_dump("最終更新日が1週間以内"); // テスト用
+		$setting_cache_time = ($sbs_cache_time['1week']['day'] * 24 * 60 * 60) + ($sbs_cache_time['1week']['hour'] * 60 * 60) + ($sbs_cache_time['1week']['minute'] * 60);
+		$debug_Log['投稿の最終更新日から'] = "1日以上、1週間以内";
 	} else { // それ以上
 		$exp_time = $sbs->exp_time($current_time, $sbs_cache_time['after']['day'], $sbs_cache_time['after']['hour'], $sbs_cache_time['after']['minute']);
-		// var_dump("最終更新日が1週間以上"); // テスト用
+		$setting_cache_time = ($sbs_cache_time['after']['day'] * 24 * 60 * 60) + ($sbs_cache_time['after']['hour'] * 60 * 60) + ($sbs_cache_time['after']['minute'] * 60);
+		$debug_Log['投稿の最終更新日から'] = "1週間以上経過";
 	}
 
-
-
-
-	// 対応する投稿IDのキャッシュをデータベースから取得する
-	// acpが有効な場合はapcにデータを保存して再利用する
+	// クエリの組み立て
 	$query = "SELECT day,twitter_count,facebook_count,google_count,hatena_count,pocket_count,feedly_count FROM {$table_name} WHERE postid = {$postid}";
-	if ( function_exists( 'apc_store' ) && ini_get( 'apc.enabled' ) ) { // apcモジュール読み込まれており、更に有効かどうか調べる
+
+	// acpが有効な場合はapcにデータを保存して再利用する
+	if ( function_exists( 'apc_store' ) && ini_get( 'apc.enabled' ) ) { // apcモジュール読み込まれており、更に有効かどうか、キャッシュの有効期限が切れてないか調べる
+		$debug_Log['サーバのapc cache'] = "有効";
 		$sbs_apc_key = "sbs_db_cache_" . md5( __FILE__ ) . $postid; // md5で一意性確保
-		// var_dump("apc有効");
+
 		if ( apc_fetch( $sbs_apc_key ) ) { // キャッシュがある場合
+
 			$result = apc_fetch( $sbs_apc_key );
-			// var_dump("apcキャッシュ見つかった");
-		} else { // キャッシュがない場合（データベースのキャッシュを取得）
+			$debug_Log['apc cache'] = "見つかった";
+
+			// キャッシュの有効期限が切れている場合（古い設定のAPCキャッシュが残っていることがあるため）
+			if ( 0 > strtotime($result->day)+$setting_cache_time-$current_time ) {
+				$debug_Log['apc cacheの有効性'] = "古い設定のため新しいものに更新";
+
+				$result = $wpdb->get_row( $query );
+				apc_store( $sbs_apc_key, $result, strtotime($result->day)+$setting_cache_time-$current_time ); // 面倒なので保存した後に2度目からAPCで表示するので注意（有効期限が整数になる必要があるため）
+			}
+
+		} else { // キャッシュがない場合
+
 			$result = $wpdb->get_row( $query );
-			apc_store( $sbs_apc_key, $result, strtotime($result->day) - $exp_time); // APCの有効期限は、キャッシュ作成日-有効期限で算出。期限切れの場合はマイナスになるがAPCでは問題ないようだ
-			// var_dump("apcキャッシュ見つからない");
+			apc_store( $sbs_apc_key, $result, strtotime($result->day)+$setting_cache_time-$current_time );
+			$debug_Log['apc cache'] = "見つからない";
+
 		}
-	} else {
-		$result = $wpdb->get_row($query);
-		// var_dump("apc無効");
+
+	} else { // apcが無効な場合
+
+		$result = $wpdb->get_row( $query );
+		$debug_Log['サーバのapc cache'] = "無効";
+
 	}
 
+	$debug_Log['サイトのローカルタイム'] = date("Y-m-d H:i:s",$current_time);
+	$debug_Log['投稿の最終更新日時'] = date("Y-m-d H:i:s",$pfx_date);
+	$debug_Log['キャッシュの取得時間'] = date("Y-m-d H:i:s",strtotime($result->day));
+	$debug_Log['キャッシュの有効期限'] = date("Y-m-d H:i:s",strtotime($result->day)+$setting_cache_time);
+	$debug_Log['キャッシュの残り時間'] = strtotime($result->day)+$setting_cache_time-$current_time . "秒";
 
+	// キャッシュの取得日時が有効期限内の場合（キャッシュの有効期限がある場合）
+	if ( strtotime($result->day)+$setting_cache_time-$current_time > 0 ) {
 
+		$debug_Log['キャッシュ'] = "期限内";
 
-	// var_dump("投稿の最終更新日時取得" . date("Y-m-d H:i:s",$pfx_date) . "<br>");
-	// var_dump("ブログのローカルタイム取得" . date("Y-m-d H:i:s",$current_time) . "<br>");
-	// var_dump("有効期限" . date("Y-m-d H:i:s",$exp_time) . "<br>");
-	// var_dump("キャッシュの取得時間" . date("Y-m-d H:i:s",strtotime($result->day)) . "<br>");
-
-	// キャッシュの取得日時が有効期限内の場合
-	if ( strtotime($result->day) > $exp_time ) {
-
-		// var_dump("キャッシュが有効期限内"); // テスト用
+		// デバックモード用の出力
+		if ( $debug_mode ) {
+			echo "<!--" . "\n";
+			echo "SBS Social Count Cacheデバックモード" . "\n";
+			foreach( $debug_Log as $key => $value ) {
+				echo $key . ':' . $value . "\n";
+			}
+			echo "-->";
+		}
+		// キャッシュを利用して返す
 		return $sbs->get_cache( $result, $active_sns );
 
 	} else { // 有効期限切れの場合
 
-		// var_dump("キャッシュが有効期限切れ"); // テスト用
+		$debug_Log['キャッシュ'] = "期限切れ";
+
+		// デバックモード用の出力
+		if ( $debug_mode ) {
+			echo "<!--" . "\n";
+			echo "SBS Social Count Cacheデバックモード" . "\n";
+			foreach( $debug_Log as $key => $value ) {
+				echo $key . ':' . $value . "\n";
+			}
+			echo "-->";
+		}
+
 		return $sbs->add_cache( $postid, $url, $active_sns );
 
 	}
+
+
+
+
 }
 
 
@@ -1306,3 +1489,122 @@ function sbs_get_pp_pocket( $page = 10, $post_type = "post" ) {
 
 	return sbs_get_popular_post( 'pocket_count', $page, $post_type );
 }
+
+
+
+
+/**
+ * Template tag - バルーンタイプのカウントを出力する
+ * 引数に何も入力しないとデフォルトの順番で表示する
+ * 
+ * @param	args		取得するポストタイプ表示順に配列で指定する
+ * 
+ * @return	str			バルーン用のHTMLとCSSを出力
+ */
+function sbs_balloon_style( $args = false ) {
+
+	if ( ! $args ) {
+		$args = array( "hatena", "twitter", "google", "facebook", "pocket", "feedly" );
+	}
+
+	$sbs = new SBS_SocialCountCache();
+	$sbs->balloon_style(); // CSSの登録
+
+	$url = get_permalink();
+	$site_title = get_bloginfo( 'name' );
+	$title = get_the_title();
+	$socal_count = sbs_get_all();
+
+	// デフォルトはRSS2、設定でユーザーの入力値がある場合は、そのフィードをカウントする
+	if ( @$sbs->sbs_active_sns["rss_url"] == "" ) {
+		$feed_url = get_bloginfo( 'rss2_url' );
+	} else {
+		$feed_url = $sbs->sbs_active_sns["rss_url"];
+	}
+
+	echo '<div class="SBS_SocialCountCache_balloon">';
+	echo '<ul>';
+
+	$pocket_default = '<li class="pocket_count"><div class="bubble"><a href="https://getpocket.com/edit.php?url=' . $url . '" class="count" target="_blank">' . $socal_count["pocket"] . '</a></div><a class="bgimage" href="https://getpocket.com/edit.php?url=' . $url . '" class="count" target="_blank"></a></li>';
+	$feedly_default = '<li class="feedly_count"><div class="bubble"><a href="http://feedly.com/i/subscription/feed/' . $feed_url . '" class="count" target="_blank">' . $socal_count["feedly"] . '</a></div><a class="bgimage" href="http://feedly.com/i/subscription/feed/' . $feed_url . '" class="count" target="_blank"></a></li>';
+
+	foreach( $args as $arg ){
+		if ( $arg == "hatena" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['hatena_balloon'], $socal_count['hatena'] ); // ブランケットのタグを置き換えて出力
+		} elseif ( $arg == "twitter" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['twitter_balloon'], $socal_count['twitter'] );
+		} elseif ( $arg == "google" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['google_balloon'], "―" );
+		} elseif ( $arg == "facebook" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['facebook_balloon'], $socal_count['facebook'] );
+		} elseif ( $arg == "pocket" ) {
+			echo $pocket_default;
+		} elseif ( $arg == "feedly" ) {
+			echo $feedly_default;
+		}
+	}
+
+	echo '</ul>';
+	echo '</div><!-- .SBS_SocialCountCache_balloon -->';
+}
+
+
+
+
+/**
+ * Template tag - スクエアタイプのカウントを出力する
+ * 引数に何も入力しないとデフォルトの順番で表示する
+ * 
+ * @param	args		取得するポストタイプ表示順に配列で指定する
+ * 
+ * @return	str			スクエア用のHTMLとCSSを出力
+ */
+function sbs_square_style( $args = false ) {
+
+	if ( ! $args ) {
+		$args = array( "hatena", "twitter", "google", "facebook", "pocket", "feedly" );
+	}
+
+	$sbs = new SBS_SocialCountCache();
+	$sbs->square_style(); // CSSの登録
+
+	$url = get_permalink();
+	$site_title = get_bloginfo( 'name' );
+	$title = get_the_title();
+	$socal_count = sbs_get_all();
+
+	// デフォルトはRSS2、設定でユーザーの入力値がある場合は、そのフィードをカウントする
+	if ( @$sbs->sbs_active_sns["rss_url"] == "" ) {
+		$feed_url = get_bloginfo( 'rss2_url' );
+	} else {
+		$feed_url = $sbs->sbs_active_sns["rss_url"];
+	}
+
+	$pocket_default = '<li class="pocket_count"><a href="https://getpocket.com/edit.php?url=' . $url . '" class="count" target="_blank"></a><span class="count">' . $socal_count["pocket"] . '</span></li>';
+	$feedly_default = '<li class="feedly_count"><a href="http://feedly.com/i/subscription/feed/' . $feed_url . '" class="count" target="_blank"></a><span class="count">' . $socal_count["feedly"] . '</span></li>';
+
+	echo '<div class="SBS_SocialCountCache_square">';
+	echo '<ul>';
+
+	foreach( $args as $arg ){
+		if ( $arg == "hatena" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['hatena_square'], $socal_count['hatena'] ); // ブランケットのタグを置き換えて出力
+		} elseif ( $arg == "twitter" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['twitter_square'], $socal_count['twitter'] );
+		} elseif ( $arg == "google" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['google_square'] );
+		} elseif ( $arg == "facebook" ) {
+			echo $sbs->tag_rep( $sbs->sbs_original_tag['facebook_square'], $socal_count['facebook'] );
+		} elseif ( $arg == "pocket" ) {
+			echo $pocket_default;
+		} elseif ( $arg == "feedly" ) {
+			echo $feedly_default;
+		}
+	}
+
+	echo '</ul>';
+	echo '</div><!-- .SBS_SocialCountCache_square -->';
+}
+
+
+

@@ -1,0 +1,95 @@
+/* SBS_SocialCountCache_square—p
+------------------------------------------------------------ */
+.SBS_SocialCountCache_square {
+	font-size: 93%;
+	font-weight: 700;
+	color: #575757;
+}
+
+.SBS_SocialCountCache_square ul {
+	margin: 0;
+}
+
+.SBS_SocialCountCache_square a {
+	float: left;
+	display: block;
+	height: 24px;
+	width: 25px;
+	text-decoration: none;
+}
+
+.SBS_SocialCountCache_square .count {
+	float: left;
+	line-height: 1.8em;
+}
+
+li.hatena_count, li.twitter_count, li.google_count, li.facebook_count, li.pocket_count, li.feedly_count{
+	float: left;
+	margin: 0 10px 10px 0;
+}
+
+.SBS_SocialCountCache_square .hatena_count a {
+	background-image: url(../images/sbs-icon.png);
+	background-position: -75px 48px;
+	margin: 0 5px 0 0;
+	padding: 0;
+}
+
+.SBS_SocialCountCache_square .hatena_count a:hover {
+	background-position: -75px 24px;
+}
+
+.SBS_SocialCountCache_square .twitter_count a {
+	background-image: url(../images/sbs-icon.png);
+	background-position: -25px 48px;
+	margin: 0 5px 0 0;
+	padding: 0;
+}
+
+.SBS_SocialCountCache_square .twitter_count a:hover {
+	background-position: -25px 24px;
+}
+
+.SBS_SocialCountCache_square .google_count a {
+	background-image: url(../images/sbs-icon.png);
+	background-position: -50px 48px;
+	margin: 0 5px 0 0;
+	padding: 0;
+}
+
+.SBS_SocialCountCache_square .google_count a:hover {
+	background-position: -50px 24px;
+}
+
+.SBS_SocialCountCache_square .facebook_count a {
+	background-image: url(../images/sbs-icon.png);
+	background-position: 0px 48px;
+	margin: 0 5px 0 0;
+	padding: 0;
+}
+
+.SBS_SocialCountCache_square .facebook_count a:hover {
+	background-position: 0px 24px;
+}
+
+.SBS_SocialCountCache_square .pocket_count a {
+	background-image: url(../images/sbs-icon.png);
+	background-position: -100px 48px;
+	margin: 0 5px 0 0;
+	padding: 0;
+}
+
+.SBS_SocialCountCache_square .pocket_count a:hover {
+	background-position: -100px 24px;
+}
+
+.SBS_SocialCountCache_square .feedly_count a {
+	background-image: url(../images/sbs-icon.png);
+	background-position: -125px 48px;
+	margin: 0 5px 0 0;
+	padding: 0;
+}
+
+.SBS_SocialCountCache_square .feedly_count a:hover {
+	background-position: -125px 24px;
+}

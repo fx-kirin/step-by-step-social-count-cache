@@ -3,8 +3,21 @@
 
 <?php
 
-// 設定保存時のメッセージ
+// 古いバージョンからアップデート時のエラーメッセージ
+if( empty( $this->sbs_original_tag ) ) { // 1.3.3以前のバージョンからアップデートした場合
 
+	// オリジナルタグの項目がセットされていない場合に表示されるエラーメッセージ
+	add_settings_error(
+	    'sbs_original_tag-empty', // エラーのスラッグ
+	    'sbs_original_tag-empty', // エラーのコード　<div>のidに割り振られる
+	    __('1.3.3以前のバージョンからアップデートした場合、1度プラグインを停止し、再度有効にしてください。', 'sbs_social_count_cache'), // エラーメッセージ,ローカライゼーションする気ないので第2引数はいらない
+	    'error' // メッセージタイプ。error もしくは notice
+	);
+	settings_errors('sbs_original_tag-empty'); // 引数でエラーのスラッグを指定するとエラーを限定できる
+
+}
+
+// 設定保存時のメッセージ
 if( empty( $this->sbs_facebook_app_token ) ) { // FacebookのApp Tokenが設定されていない場合
 
 	// FacebookのApp Tokenが入力されるまで表示されるエラーメッセージ
@@ -16,6 +29,23 @@ if( empty( $this->sbs_facebook_app_token ) ) { // FacebookのApp Tokenが設定�
 	);
 	settings_errors('app-token-empty'); // 引数でエラーのスラッグを指定するとエラーを限定できる
 
+} else { // tokenが正しいかチェック
+
+	$url = site_url(); // テスト用に適当にURLを取得
+	$graph_url = 'https://graph.facebook.com/v2.4/' . rawurlencode($url) . '?access_token=' . $this->sbs_facebook_app_token;
+	$result = wp_remote_get( $graph_url, array( 'timeout' => 5 ) ); // たまに異常に重い時があるので注意
+	$decoded_response = json_decode( $result["body"], true ); // jsonをデコード。trueで連想配列に変換
+
+	if( $decoded_response["error"]["type"] == "OAuthException" ) {
+		// FacebookのApp Tokenが間違っている場合にエラーメッセージ
+		add_settings_error(
+		    'app-token-invalid',
+		    'app-token-invalid',
+		    __('FacebookのApp Tokenが誤っています。値を確認してください。', 'sbs_social_count_cache'),
+		    'error'
+		);
+		settings_errors('app-token-invalid');
+	}
 }
 
 if( $this->sbs_facebook_app_token == "validation_error" ) {
@@ -32,7 +62,7 @@ if( $this->sbs_facebook_app_token == "validation_error" ) {
 }
 
 
-if( $this->sbs_active_sns[rss_url] == "url_error" ) {
+if( $this->sbs_active_sns['rss_url'] == "url_error" ) {
 
 	// 不正な入力値が入っていた場合のエラーメッセージ
 	add_settings_error(
@@ -82,7 +112,7 @@ if( $this->sbs_active_sns[rss_url] == "url_error" ) {
 		<td>
 		<fieldset>
 			<label>
-				<input type="text" name="sbs_active_sns[rss_url]" value="<?php if(isset($this->sbs_active_sns["rss_url"])) echo esc_html( $this->sbs_active_sns["rss_url"] ); ?>" size="45">
+				<input type="text" name="sbs_active_sns['rss_url']" value="<?php if(isset($this->sbs_active_sns['rss_url'])) echo esc_html( $this->sbs_active_sns['rss_url'] ); ?>" size="45">
 			</label>
 		</fieldset>
 		</td>
@@ -103,8 +133,8 @@ if( $this->sbs_active_sns[rss_url] == "url_error" ) {
 		<td>
 		<fieldset>
 			<label for="twitter">
-				<input type="hidden" name="sbs_active_sns[twitter]" value="0"><?php // チェック入れてない時でも0を返すようにする  ?>
-				<input name="sbs_active_sns[twitter]" type="checkbox" id="twitter" value="1" <?php if( !empty( $this->sbs_active_sns['twitter'] ) ){ echo 'checked="checked"'; } ?>>twitter</input>
+				<input type="hidden" name="sbs_active_sns[twitter]" value="0">
+				<input name="sbs_active_sns[twitter]" type="checkbox" id="twitter" value="1" <?php if( !empty( $this->sbs_active_sns['twitter'] ) ){ echo 'checked="checked"'; } ?>>Twitter （Twitterのカウントは事前に<a href="https://jsoon.digitiminimi.com/">widgetoon.js & count.jsoon</a>でサイト登録をする必要があります。）</input>
 			</label><br>
 			<label for="facebook">
 				<input type="hidden" name="sbs_active_sns[facebook]" value="0">
@@ -222,6 +252,205 @@ if( $this->sbs_active_sns[rss_url] == "url_error" ) {
 		</fieldset>
 		</td>
 		</tr>
+	</tbody>
+</table>
+
+<hr>
+
+<h3><?php _e('バルーンタイプもしくはスクエアタイプのタグ', 'sbs_social_count_cache'); ?></h3>
+<p><?php _e('sbs_balloon_style() もしくは sbs_square_style() のタグをカスタマイズします。（空欄にするとデフォルトのコードになります。）', 'sbs_social_count_cache'); ?></p>
+
+<h4><?php _e('以下の専用タグを使用することができます。', 'sbs_social_count_cache'); ?></h4>
+
+<ul>
+<li><?php _e('[[url]] = ページのURL', 'sbs_social_count_cache'); ?></li>
+<li><?php _e('[[site_title]] = サイト名', 'sbs_social_count_cache'); ?></li>
+<li><?php _e('[[title]] = ページのタイトル', 'sbs_social_count_cache'); ?></li>
+<li><?php _e('[[count]] = それぞれのSNSのカウント数', 'sbs_social_count_cache'); ?></li>
+</ul>
+
+<?php
+
+	// 値が空の場合はデフォルト値を入れる
+	$original_tag_arg = array(
+		"hatena_balloon", "hatena_square",
+		"twitter_balloon", "twitter_square",
+		"google_balloon", "google_square",
+		"facebook_balloon", "facebook_square"
+	);
+
+	foreach( $original_tag_arg as $original_tag ) {
+
+		if ( $this->sbs_original_tag[$original_tag] == "" ){
+			$sns_arg[$original_tag] = $this->sbs_original_tag_default[$original_tag];
+		} else {
+			$sns_arg[$original_tag] = $this->sbs_original_tag[$original_tag];
+		}
+	}
+
+?>
+
+<hr>
+
+<h2><?php _e('バルーンタイプ', 'sbs_social_count_cache'); ?></h2>
+
+<table class="form-table">
+	<tbody>
+	<tr>
+		<th><label><?php _e('Twitter', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				// htmlの入力に対応したフォーム（値のエスケープを忘れずに）
+				wp_editor( esc_html( $sns_arg['twitter_balloon'] ), 'twitter_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[twitter_balloon]',
+					'textarea_rows' => 5
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php _e('Facebook', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				wp_editor( esc_html( $sns_arg['facebook_balloon'] ), 'facebook_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[facebook_balloon]',
+					'textarea_rows' => 3
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php _e('Google+', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				wp_editor( esc_html( $sns_arg['google_balloon'] ), 'google_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[google_balloon]',
+					'textarea_rows' => 3
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php _e('はてなブックマーク', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				wp_editor( esc_html( $sns_arg['hatena_balloon'] ), 'hatena_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[hatena_balloon]',
+					'textarea_rows' => 3
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	</tbody>
+</table>
+
+<hr>
+
+<h2><?php _e('スクエアタイプ', 'sbs_social_count_cache'); ?></h2>
+
+<table class="form-table">
+	<tbody>
+	<tr>
+		<th><label><?php _e('Twitter', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				// htmlの入力に対応したフォーム（値のエスケープを忘れずに）
+				wp_editor( esc_html( $sns_arg['twitter_square'] ), 'twitter_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[twitter_square]',
+					'textarea_rows' => 5
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php _e('Facebook', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				wp_editor( esc_html( $sns_arg['facebook_square'] ), 'facebook_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[facebook_square]',
+					'textarea_rows' => 3
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php _e('Google+', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				wp_editor( esc_html( $sns_arg['google_square'] ), 'google_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[google_square]',
+					'textarea_rows' => 3
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
+	<tr>
+		<th><label><?php _e('はてなブックマーク', 'sbs_social_count_cache'); ?></label></th>
+		<td>
+		<fieldset>
+			<?php
+				wp_editor( esc_html( $sns_arg['hatena_square'] ), 'hatena_message', array(
+					'tinymce' => false,
+					'quicktags' => false,
+					'teeny' => false,
+					'wpautop' => false,
+					'media_buttons' => false,
+					'textarea_name' => 'sbs_original_tag[hatena_square]',
+					'textarea_rows' => 3
+				) );
+			?>
+		</fieldset>
+		</td>
+	</tr>
 	</tbody>
 </table>
 
