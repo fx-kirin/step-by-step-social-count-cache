@@ -1501,7 +1501,7 @@ function sbs_get_pp_pocket( $page = 10, $post_type = "post" ) {
  * 
  * @return	str			バルーン用のHTMLとCSSを出力
  */
-function sbs_balloon_style( $args = false ) {
+function sbs_balloon_style( $args = false , $url = '') {
 
 	if ( ! $args ) {
 		$args = array( "hatena", "twitter", "google", "facebook", "pocket", "feedly" );
@@ -1510,7 +1510,9 @@ function sbs_balloon_style( $args = false ) {
 	$sbs = new SBS_SocialCountCache();
 	$sbs->balloon_style(); // CSSの登録
 
-	$url = get_permalink();
+    if ($url == ''){
+        $url = get_permalink();
+    }
 	$site_title = get_bloginfo( 'name' );
 	$title = get_the_title();
 	$socal_count = sbs_get_all();
